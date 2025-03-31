@@ -1,4 +1,4 @@
-package cisa
+package cisakev
 
 import (
 	"encoding/csv"
@@ -15,20 +15,6 @@ const (
 	CISAURL     = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
 	CISAKEVFile = "known_exploited_vulnerabilities.csv"
 )
-
-type KEV struct {
-	CVEID                      string
-	VendorProject              string
-	Product                    string
-	VulnerabilityName          string
-	DateAdded                  string
-	ShortDescription           string
-	RequiredAction             string
-	DueDate                    string
-	KnownRansomwareCampaignUse string
-	Notes                      string
-	CWEs                       string
-}
 
 func LoadCISAKEVs(dataDir string, forceRefresh bool, maxage time.Duration) ([]KEV, error) {
 	filePath := filepath.Join(dataDir, CISAKEVFile)
