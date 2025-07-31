@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,19 +15,52 @@ const (
 	CISAKEVFile = "known_exploited_vulnerabilities.csv"
 )
 
-func LoadCISAKEVs(dataDir string, forceRefresh bool, maxage time.Duration) ([]KEV, error) {
+type CISAKEVS struct {
+	KEVs   []KEV `json:"kevs"`
+	logger Logger
+}
+
+type KEV struct {
+	CVEID                      string
+	VendorProject              string
+	Product                    string
+	VulnerabilityName          string
+	DateAdded                  string
+	ShortDescription           string
+	RequiredAction             string
+	DueDate                    string
+	KnownRansomwareCampaignUse string
+	Notes                      string
+	CWEs                       string
+}
+
+// NewCISAKEVs creates a new CISAKEVS instance with optional logger
+func NewCISAKEVs(logger Logger) *CISAKEVS {
+	// Use default logger if none provided
+	if logger == nil {
+		logger = &defaultLogger{}
+	}
+
+	return &CISAKEVS{
+		KEVs:   []KEV{},
+		logger: logger,
+	}
+}
+
+// LoadCISAKEVs loads KEVs from local file or downloads from CISA
+func (c *CISAKEVS) LoadCISAKEVs(dataDir string, forceRefresh bool, maxage time.Duration) error {
 	filePath := filepath.Join(dataDir, CISAKEVFile)
 	shouldDownload := forceRefresh
 
 	if stat, err := os.Stat(filePath); err == nil {
 		if time.Since(stat.ModTime()) > maxage {
-			log.Println("CISA KEV file is older than 7 days. Downloading new one.")
+			c.logger.Info("CISA KEV file is older than threshold. Downloading new one.")
 			shouldDownload = true
 		} else {
-			log.Println("CISA KEV file is fresh. Using local copy.")
+			c.logger.Info("CISA KEV file is fresh. Using local copy.")
 		}
 	} else {
-		log.Println("CISA KEV file not found. Downloading.")
+		c.logger.Info("CISA KEV file not found. Downloading.")
 		shouldDownload = true
 	}
 
@@ -37,16 +69,22 @@ func LoadCISAKEVs(dataDir string, forceRefresh bool, maxage time.Duration) ([]KE
 	}
 
 	if shouldDownload {
-		if err := downloadFile(CISAURL, filePath); err != nil {
-			return nil, err
+		if err := c.downloadFile(CISAURL, filePath); err != nil {
+			return err
 		}
-		log.Println("CISA KEV file downloaded and saved to:", filePath)
+		c.logger.Info("CISA KEV file downloaded and saved to: " + filePath)
 	}
 
-	return readCSV(filePath)
+	kevs, err := c.readCSV(filePath)
+	if err != nil {
+		return err
+	}
+
+	c.KEVs = kevs
+	return nil
 }
 
-func downloadFile(url, filePath string) error {
+func (c *CISAKEVS) downloadFile(url, filePath string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -67,7 +105,7 @@ func downloadFile(url, filePath string) error {
 	return err
 }
 
-func readCSV(path string) ([]KEV, error) {
+func (c *CISAKEVS) readCSV(path string) ([]KEV, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -86,7 +124,7 @@ func readCSV(path string) ([]KEV, error) {
 			continue
 		}
 		if len(row) < 11 {
-			log.Println("Skipping malformed row:", row)
+			c.logger.Warn("Skipping malformed row")
 			continue
 		}
 		kev := KEV{
@@ -107,3 +145,18 @@ func readCSV(path string) ([]KEV, error) {
 
 	return kevs, nil
 }
+
+// GetKEVs returns the loaded KEVs
+func (c *CISAKEVS) GetKEVs() []KEV {
+	return c.KEVs
+}
+
+// // For backward compatibility with the package-level function
+// func LoadCISAKEVs(dataDir string, forceRefresh bool, maxage time.Duration) ([]KEV, error) {
+// 	c := New(nil)
+// 	err := c.LoadCISAKEVs(dataDir, forceRefresh, maxage)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return c.GetKEVs(), nil
+// }

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/aN0mad/go-cisaKevs/internal/cisa"
+	"github.com/aN0mad/go-cisaKevs/cisakev"
 )
 
 var (
@@ -27,11 +27,19 @@ func main() {
 		}
 	}
 
-	// Load CISA KEVs
-	kevs, err := cisa.LoadCISAKEVs(dataDir, force, MaxAge)
+	// Create CISA KEVs instance with default logger
+	cisaKevs := cisakev.NewCISAKEVs(nil) // Use default logger
+	if cisaKevs == nil {
+		log.Fatal("Failed to create CISA KEVs instance")
+	}
+
+	// Load KEVs from local file or download if necessary
+	err := cisaKevs.LoadCISAKEVs(dataDir, force, MaxAge)
 	if err != nil {
 		log.Fatal("Error loading KEVs:", err)
 	}
 
+	// Get loaded KEVs
+	kevs := cisaKevs.GetKEVs()
 	fmt.Printf("✅ Loaded %d Known Exploited Vulnerabilities\n", len(kevs))
 }

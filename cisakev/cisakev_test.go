@@ -15,10 +15,12 @@ func TestLoadCISAKEVs(t *testing.T) {
 	// Remove if already exists
 	_ = os.Remove(filePath)
 
-	kevs, err := LoadCISAKEVs(tmpDir, true, time.Duration(maxage))
+	c := NewCISAKEVs(nil)
+	err := c.LoadCISAKEVs(tmpDir, true, time.Duration(maxage))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	kevs := c.GetKEVs()
 
 	if len(kevs) == 0 {
 		t.Fatalf("expected some KEVs, got 0")
